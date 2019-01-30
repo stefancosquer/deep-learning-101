@@ -1,0 +1,101 @@
+<html>
+    <head>
+        <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@0.14.2/dist/tf.min.js"></script>
+        <script type="text/javascript">
+            window.onload = function() {
+                var CLASSES = [
+                    ["cereale", "eau", "jambon", "oeuf", "pate", "soda"],
+                    ["barilla", "breizh-cola", "chocapic", "coca-cola", "coco-pops", "cristaline", "fanta", "fleury-michon", "lion", "loue", "miel-pops", "nesquik", "orangina", "pepsi", "tresor", "u"],
+                    ["aucun", "bleu-blanc-coeur", "label-rouge"],
+                    ["pas bio", "bio"]
+                ];
+                var video = document.getElementById('video');
+
+                var elm = [
+                    document.getElementById('famille'),
+                    document.getElementById('marque'),
+                    document.getElementById('label'),
+                    document.getElementById('bio')
+                ];
+
+                var model = [];
+
+                // Chargement du modèle sauvegardé
+                function loadModel() {
+                    tf.loadModel('tfjs/famille/model.json').then(function(loaded) {
+                        model.push(loaded);
+                        tf.loadModel('tfjs/marque/model.json').then(function(loaded) {
+                            model.push(loaded);
+                            tf.loadModel('tfjs/label/model.json').then(function(loaded) {
+                                model.push(loaded);
+                                tf.loadModel('tfjs/bio/model.json').then(function(loaded) {
+                                    model.push(loaded);
+                                    requestAnimationFrame(predict);
+                                });
+                            });
+                        });
+                    });
+                }
+
+                // Initialisation de la webcam
+                function init() {
+                    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                        navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
+                            video.srcObject = stream;
+                            video.play();
+                            loadModel();
+                        });
+                    }
+                }
+
+                function display(values, e, i) {
+                    var max = 0;
+                    var clazz = -1;
+                    for (var j = 0; j < values.length; j++) {
+                        if (values[j] > max) {
+                            max = values[j];
+                            clazz= j;
+                        }
+                    }
+                    if (clazz >= 0) {
+                        e.innerHTML = CLASSES[i][clazz] + ' (' + (max * 100).toFixed(2) + '%)' + '<br>';
+                    }
+                }
+
+                function predict() {
+                    // La fonction tidy permet de libérer les ressources GPU allouées
+                    tf.tidy(function() {
+
+                        // Préparation de l'image
+                        var input = tf.fromPixels(video)
+                            .resizeNearestNeighbor([224, 224])
+                            .toFloat().sub(tf.scalar(127.5))
+                            .div(tf.scalar(127.5))
+                            .expandDims();
+
+                        var i = 0;
+
+                        // Prédiction
+                        for (var j = 0; j < model.length; j++) {
+                            const k = j;
+                            model[j].predict(input).data().then(function(value) {
+                                display(value, elm[k], k);
+                                i++;
+                                if (i === model.length) requestAnimationFrame(predict);
+                            });
+                        }
+                    })
+                }
+                init();
+            }
+        </script>
+    </head>
+    <body>
+        <video id="video" width="320" height="240" autoplay></video>
+        <div id="famille">loading...</div>
+        <div id="marque"></div>
+        <div id="label"></div>
+        <div id="bio"></div>
+    </body>
+</html>
+
